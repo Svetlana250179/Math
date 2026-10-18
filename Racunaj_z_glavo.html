@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Računaj z glavo</title>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef5f1;--board:#fffdf7;--edge:#c9ddd3;--ink:#1d3a33;--gold:#f2b705;--gold2:#c98a00;--key:#fff;--key2:#c3d6cc;--ok:#1f9d55;--bad:#d93f3f;color-scheme:light;
+padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:Rubik,"Segoe UI",Arial,sans-serif;overflow:hidden}
+#app{height:100%;max-width:480px;margin:0 auto;display:flex;flex-direction:column}
+#hud{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;font-weight:700;font-size:18px}
+#menu{border:1.5px solid var(--key2);background:#fff;border-radius:10px;padding:6px 12px;font:700 15px Rubik,sans-serif;color:var(--ink)}
+#field{flex:1;margin:0 10px;border-radius:16px;background:var(--board);border:2px solid var(--edge);display:flex;align-items:center;justify-content:center;padding:12px;overflow:hidden}
+#ex{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:6px 14px;font-size:clamp(40px,12.5vw,64px);font-weight:700;line-height:1.1;text-align:center}
+.box{display:inline-block;min-width:1.6em;height:1.4em;line-height:1.3em;border:4px solid var(--ink);border-radius:12px;text-align:center;transition:transform .25s ease-in}
+.box.ok{border-color:var(--ok);background:#e3f6ea;color:var(--ok)}
+.box.no{border-color:var(--bad);background:#fde8e8;color:var(--bad)}
+.mark{font-size:1.1em}
+#keys{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;padding:10px 10px 12px}
+#keys button{height:56px;border-radius:12px;background:var(--key);color:var(--ink);font:700 25px Rubik,sans-serif;box-shadow:0 4px 0 var(--key2);border:1.5px solid var(--key2)}
+#keys button:active{transform:translateY(3px);box-shadow:0 1px 0 var(--key2)}
+#keys .sg{background:#d7ecf5;border-color:#a9cddd;box-shadow:0 4px 0 #a9cddd}
+#keys .en{grid-column:span 2;background:var(--gold);border-color:var(--gold2);box-shadow:0 4px 0 var(--gold2);font-size:20px}
+#keys .ps{grid-column:span 3;background:#e3eee8;font-size:17px}
+#ov{position:absolute;inset:0;background:#eef5f1f2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;padding:24px;z-index:5}
+#ov h1{margin:0;font-size:34px}#ov p{margin:0;max-width:310px;line-height:1.4;font-size:17px}
+.modes{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.modes button,#go{border:2px solid var(--gold2);background:#fff;color:var(--ink);padding:10px 16px;border-radius:12px;font:700 17px Rubik,sans-serif}
+.modes button.on{background:var(--gold)}
+#go{background:var(--gold);font-size:21px;padding:12px 36px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hud"><span id="lv">Raven 1</span><span id="sc">0 / 10</span><button id="menu">Meni</button></div>
+  <div id="field"><div id="ex"></div></div>
+  <div id="keys"></div>
+</div>
+<div id="ov"><h1>Računaj z glavo</h1><p>Vpiši manjkajoče število ali znak in pritisni »Preveri«.</p>
+<div class="modes"><button data-m="add" class="on">Seštevanje</button><button data-m="mul">Množenje</button><button data-m="all">Vse skupaj</button></div>
+<button id="go">Igraj</button></div>
+<script>
+const $=s=>document.querySelector(s),R=n=>Math.floor(Math.random()*n),sleep=ms=>new Promise(r=>setTimeout(r,ms));
+let mode='add',cur=null,typed='',busy=false,lvl=1,got=0;
+const PER=10,K=$('#keys');
+'1234567890'.split('').forEach(d=>add(d,d));
+['+','−','×',':'].forEach(s=>add(s,s,'sg'));
+add('⌫','bs','sg');add('Preveri','en','en');add('Preskoči','sk','ps');
+function add(t,v,c){const b=document.createElement('button');b.textContent=t;if(c)b.className=c;b.onclick=()=>key(v);K.appendChild(b)}
+function task(){
+  const kinds=mode=='add'?['a','s','e','g']:mode=='mul'?['m','d','m','d','g']:['a','s','e','m','d','g'];
+  const k=kinds[R(kinds.length)],mx=lvl<3?10:20;let a,b,c,t,p;
+  if(k=='a'){a=1+R(mx-1);b=1+R(mx-a);p=[a,'+',b,'=',a+b]}
+  else if(k=='s'){c=2+R(mx-1);b=1+R(c-1);p=[c,'−',b,'=',c-b]}
+  else if(k=='m'){a=2+R(8);b=2+R(8);p=[a,'×',b,'=',a*b]}
+  else if(k=='d'){a=2+R(8);b=2+R(8);p=[a*b,':',b,'=',a]}
+  else if(k=='e'){a=1+R(9);b=1+R(9);t=a+b;c=1+R(t-1);p=[a,'+',b,'=',c,'+',t-c]}
+  else{a=2+R(5);b=2+R(5);const pl=R(2);c=1+R(a*b-1);p=[a,'×',b,pl?'+':'−',c,'=',pl?a*b+c:a*b-c];return{p,i:3,ans:p[3]}}
+  const idx=[];p.forEach((x,i)=>{if(typeof x=='number')idx.push(i)});
+  const i=idx[R(idx.length)];return{p,i,ans:String(p[i])};
+}
+function next(){
+  cur=task();typed='';
+  $('#ex').innerHTML=cur.p.map((x,i)=>i==cur.i?'<span class="box"></span>':'<span>'+x+'</span>').join('');
+}
+function key(v){
+  if(busy)return;
+  if(v=='sk'){next();return}
+  if(v=='en')return submit();
+  if(v=='bs')typed=typed.slice(0,-1);
+  else if(/\D/.test(v))typed=v;
+  else typed=/^\d$/.test(typed)?typed+v:(/^\d\d$/.test(typed)?typed:v);
+  $('.box').textContent=typed;
+}
+async function submit(){
+  if(!typed)return;
+  busy=true;const right=typed==cur.ans,box=$('.box');
+  box.style.transform='rotateY(90deg)';await sleep(250);
+  box.textContent=cur.ans;box.classList.add(right?'ok':'no');box.style.transform='rotateY(0)';
+  const m=document.createElement('span');m.className='mark';m.textContent=right?'✓':'✗';m.style.color=right?'var(--ok)':'var(--bad)';$('#ex').appendChild(m);
+  await sleep(1300);
+  if(right){got++;if(got>=PER){got=0;lvl++;$('#lv').textContent='Raven '+lvl}$('#sc').textContent=got+' / '+PER}
+  busy=false;next();
+}
+function start(){got=0;lvl=1;busy=false;$('#lv').textContent='Raven 1';$('#sc').textContent='0 / '+PER;$('#ov').style.display='none';next()}
+document.querySelectorAll('.modes button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.modes button').forEach(x=>x.classList.remove('on'));b.classList.add('on');mode=b.dataset.m});
+$('#go').onclick=start;
+$('#menu').onclick=()=>{if(!busy){$('#go').textContent='Igraj';$('#ov').style.display='flex'}};
+</script>
+</body>
+</html>
